@@ -1,0 +1,523 @@
+---
+title: "Clustering final"
+author: "Seo Jae Hyun"
+date: '2022 1 25 '
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(reshape2)
+library(GGally)
+library(fpc)
+library(cluster)
+library(Rtsne)
+library(factoextra)
+library(purrr)
+library(ggplot2)
+library(gridExtra)
+
+```
+
+
+
+## 1. Data importing
+
+```{r data importing}
+company=read.csv('특정 column 제거한 기업정보.csv')
+
+
+```
+
+
+
+## 2. Data manipulation
+
+1) 금액 단위 변경
+
+매출액, 영업이익 단위 : 1,000,000,000원(10억)
+연봉 단위 : 1,000,000원 (백만원)
+
+```{r data money}
+
+
+company=as.data.frame(apply(company, 2, function(x) gsub(',','', x)))
+
+
+company=as.data.frame(company %>% select(-c(산업군, 기업, 주소)) %>% apply(2, as.numeric)) %>% mutate(기업=company$기업, 산업군=company$산업군, 주소=company$주소) %>% .[, c(27, 28, 1:26, 29)]
+
+company[, 3:8]=as.data.frame(company %>% select(c(매출20:이익16)) %>% apply(2, function(x) round(x/1000000000, 2)))
+
+company[, c('남평균연봉', '여평균연봉', '평균연봉')]=as.data.frame(company %>% select(c(남평균연봉, 여평균연봉, 평균연봉)) %>%
+                                                       apply(2, function(x) round(x/1000000, 2)))
+
+
+```
+
+
+2) NA 유무 column 생성
+
+```{r making_na_column}
+
+company=company %>% mutate(이익na=apply(is.na(company), 1, sum))
+company[is.na(company)]=0
+
+```
+
+3) 이익na, 산업군 factor화
+
+```{r making_factor}
+
+company=company %>% mutate(산업군=as.factor(산업군), 이익na=as.factor(이익na))
+
+colnames(company)
+```
+
+
+변수 설명
+
+기업: 기업명
+산업군: 기업이 속한 산업군
+매출20: 2020년도 매출액(단위 : 10억원)
+이익20: 2020년도 영업이익(단위 : 10억원)
+이익19: 2019년도 영업이익(단위 : 10억원)
+이익18: 2018년도 영업이익(단위 : 10억원)
+이익17: 2017년도 영업이익(단위 : 10억원)
+이익16: 2016년도 영업이익(단위 : 10억원)
+남정직원수: 남자 정직원수
+남계약직수: 남자 계약직수
+남직원수: 남자 직원수, 남정직원수와 남계약직수의 합(단시간 근로자 제외)
+남평균근속연수: 남자 평균 근속연수(모든 부서의 남직원 평균 근속연수를 부서의 남직원수만큼 가중치를 주어 평균 계산)
+남평균연봉: 남자 평균연봉(모든 부서의 남직원 연간 지급 급여 / 남직원 수, 단위 : 100만원)
+여정직원수: 여자 정직원수
+여계약직수: 여자 계약직수
+여직원수: 여자 직원수, 여정직원수와 여계약직수의 합(단시간 근로자 제외)
+여평균근속연수: 여자 평균 근속연수(모든 부서의 여직원 평균 근속연수를 부서의 여직원수만큼 가중치를 주어 평균 계산)
+여평균연봉: 여자 평균연봉(모든 부서의 여직원 연간 지급 급여 / 여직원 수, 단위 : 100만원)
+정직원수: 정직원수
+계약직수: 계약직수
+직원수: 직원 수, 정직원수와 계약직수의 합
+평균근속연수: 평균 근속연수(모든 부서의 평균근속연수에 부서의 직원수만큼 가중치를 주어 평균 계산)
+평균연봉: 평균연봉(모든 부서의 연간 지급 급여 / 여직원 수, 단위 : 100만원)
+경도, 위도: 회사 위치를 경도, 위도로 나타낸 값
+기사개수: 2021년 해당 해사가 언급된 기사 수
+전체순위: 기사 개수 순위
+산업군순위: 산업군별 기사 개수 순위
+주소: 해당 기업 주소(기업개황에 게시된 주소)
+이익na: 16~20년 중 영업이익이 존재하지 않는 햇수
+
+
+
+## 3. EDA
+
+1) Summary statistics
+
+```{r summar_statistics}
+
+company %>% select(매출20, 이익20, 이익19, 이익17, 이익16, 정직원수, 계약직수, 직원수, 평균근속연수, 평균연봉, 기사개수, 이익na) %>% summary()
+
+```
+
+2) Visualization
+
+```{r visualize_1_line graph}
+
+
+
+
+
+line_영업이익 = company  %>%  select(이익20, 이익19, 이익18, 이익17, 이익16) %>% apply(., 2, sum, na.rm=T) %>% t(.) %>% as.data.frame(.) %>%
+  mutate(성장20 = round((이익20-이익19)/이익19*100, 2),
+             성장19 = round((이익19-이익18)/이익18*100, 2),
+             성장18 = round((이익18-이익17)/이익17*100, 2),
+             성장17 = round((이익17-이익16)/이익16*100, 2)) %>% gather(년도, 성장률, 6:9) %>% ggplot(mapping=aes(x=년도, y=성장률)) + geom_point(col='#5fa2ce', size=2) + geom_line(aes(group=1), col='#5fa2ce', size=1.3) +theme_bw() + ggtitle('영업이익 성장률') + xlab('년도') + ylab('성장률(%)') + scale_x_discrete(
+    labels = c('17년', '18년', '19년', '20년')
+  )
+
+
+
+line_영업이익
+
+
+
+```
+
+
+영업이익 성장률은 17년부터 감소하다, 19년 이후 다시 증가함
+
+19년 영업이익 성장률이 음의 값을 가짐
+
+
+
+```{r visualize 2_histogram}
+
+
+hist_직원수 = company %>% ggplot(mapping=aes(x=직원수)) +geom_histogram(bins=15, fill='#5fa2ce') + theme_bw() + ggtitle('직원수')
+
+hist_매출_1 = company %>% ggplot(mapping=aes(x=매출20)) + geom_histogram(bins=15,  fill='#5fa2ce') + ggtitle('20년도 매출액') +xlab('매출액(10억원)') +theme_bw()
+
+grid.arrange(hist_매출_1, hist_직원수, ncol=2)
+
+```
+
+
+```{r visualize 3}
+
+
+industrial_company=company %>% group_by(산업군) %>% summarise(매출20평균=mean(매출20), 이익20평균=mean(이익20), 이익19평균=mean(이익19, na.rm=T),
+                                          이익18평균=mean(이익18, na.rm=T), 이익17평균=mean(이익17, na.rm=T), 이익16평균=mean(이익16, na.rm=T), 
+                                          직원수평균=mean(직원수), 연봉평균=mean(평균연봉), 근속연수평균=mean(평균근속연수), 
+                                          기사개수평균=mean(기사개수))
+
+industry_직원수=industrial_company %>% ggplot(mapping=aes(x=산업군, y=직원수평균)) + geom_bar(stat='identity', fill='#5fa2ce') + ggtitle('산업군별 직원수') + theme_bw() + theme(axis.text.x=element_text(angle=90)) 
+
+industry_연봉=industrial_company %>% ggplot(mapping=aes(x=산업군, y=연봉평균)) + geom_bar(stat='identity', fill='#5fa2ce')+ ggtitle('산업군별 연봉')  + theme_bw() + theme(axis.text.x=element_text(angle=90))
+
+industry_근속연수=industrial_company %>% ggplot(mapping=aes(x=산업군, y=근속연수평균)) + geom_bar(stat='identity', fill='#5fa2ce')+ ggtitle('산업군별 근속연수') + theme_bw() + theme(axis.text.x=element_text(angle=90))
+
+industry_기사개수=industrial_company %>% ggplot(mapping=aes(x=산업군, y=기사개수평균)) + geom_bar(stat='identity', fill='#5fa2ce')+ ggtitle('산업군별 기사수') + theme_bw() + theme(axis.text.x=element_text(angle=90))
+
+grid.arrange(industry_직원수, industry_연봉, nrow=1)
+grid.arrange(industry_근속연수, industry_기사개수, nrow=1)
+
+
+```
+
+
+```{r visualize 4}
+
+
+
+pie_na = company %>% mutate(이익na=ifelse(이익na!=0, '유', '무')) %>% group_by(이익na) %>% summarise(count=n()) %>% ggplot(aes(x="", y=count, fill=이익na)) + geom_bar(stat='identity', width=1, color='white') + coord_polar('y', start=0) + theme_bw() + ggtitle('사업보고서 유무') + theme(axis.text.x=element_blank(), axis.title=element_blank()) + guides(fill=guide_legend(title=''))
+
+pie_na
+
+```
+
+
+
+
+## 4. Clustering
+
+1) Distance 정의
+
+Clustering에 사용되는 변수
+
+산업군, 매출20, 이익20, 이익19, 이익18, 이익17, 이익16, 남정직원수, 남계약직수, 남평균근속연수, 남평균연봉, 여정직원수, 여계약직수, 여평균근속연수, 여평균연봉, 기사개수, 이익na
+
+연속형 변수는 standardization한 후, categorical variable과 continuous variable을 모두 고려할 수 있는 거리지표인 gower distance 사용
+
+
+$$
+
+D_{Gower}(x_1, x_2)=1-\Sigma_{j=1}^ps_j(x_1, x_2)
+
+$$
+
+연속형 변수에서 $s_j(x_1, x_2)$는 range normalized된 Manhattan distance,
+
+$$
+
+s_j(x_1, x_2)=1-\frac{|y_{1j}-y_{2j}|}{R_j}
+
+
+$$
+
+범주형 변수에서 $s_j(x_1, x_2)$는 같은 범주이면 1, 다른 범주인 경우 0을 갖는 값.
+
+
+
+
+```{r gower distance}
+ 
+modeling_data=company %>% select(c(기업, 산업군, 매출20, 이익20, 이익19, 이익18, 이익17, 이익16, 남정직원수, 남계약직수, 남평균근속연수, 남평균연봉, 여정직원수, 여계약직수, 여평균근속연수, 여평균연봉, 기사개수, 이익na))
+
+
+modeling_data[, c(3:17)]=apply(modeling_data[, c(3:17)], 2, function(x) (x-mean(x))/sd(x))
+
+
+
+
+gower_dist = daisy(modeling_data[, 2:18], metric='gower')
+gower_mat = as.matrix(gower_dist)
+
+
+
+
+```
+
+
+
+2) pma clustering
+
+
+pma clustering
+
+
+k-means clustering의 경우 n개의 data object들을 각 집합 내 오브젝트 간 응집도를 최대로 하는 k개의 분할된 집합을 만드는 과정
+
+하지만 cluster의 중심점을 해당 cluster에 속하는 point의 평균값을 사용하기 때문에, 이상치에 민감하고, Euclidean distance를 사용하지 않는 경우 성능이 좋지 않은 단점을 가지고 있다.
+
+이를 보완하는 모델인 방법인 pma은 k-medoids clustering 방법론 중 하나로, 해당 cluster의 중심점을 실제 존재하는 observation의 point를 사용하여 최적의 분할된 집합을 만든다. 실제 존재하는 observation point를 cluster의 중심점을 이용하기 때문에, outlier에 둔감하고, Euclidean distance가 아닌 다른 distance measure에도 효과적인 장점을 가지고 있다.
+
+
+현재 데이터에서 outlier가 존재하기 때문에, 이를 고려하여 clustering할 수 있는 방법 중 하나인 pma clustering 진행
+
+최적의 cluster 개수를 구하기 위해, cluster 수에 따른 total within sum of square를 확인하여 elbow point인 6개의 cluster가 나오도록 clustering 진행
+
+결과인 cluster plot에서는 pca를 이용하여 얻은 variance가 가장 큰 2개의 principal component axis를 이용하여 데이터와 cluster를 표현
+
+```{r pma}
+
+
+
+fviz_nbclust(gower_mat, pam, method='wss')
+
+set.seed(0)
+result=pam(gower_mat, k=5)
+
+palette_cluster=c('#e15759', '#f28e2b', '#edc948', '#59a14f', '#5fa2ce')
+
+fviz_cluster(result, data = modeling_data) + theme_bw() + scale_fill_manual(values=(palette_cluster)) + scale_color_manual(values=palette_cluster)
+
+
+```
+
+
+
+
+## 5. Interpretation
+
+1) company dataframe에 cluster 포함시키기
+
+```{r cluster bind}
+
+clus_company=company %>% mutate(clustering=as.factor(result$clustering))
+
+
+```
+
+
+
+
+2) 각 변수별 cluster 해석
+
+
+* cluster 6은 특이점, 회사명은 삼성전자이므로, 따로 해석하고, 나머지 cluster에 대해서는 여러 변수간의 시각화를 통해서 해석
+
+
+```{r interpretation}
+
+
+
+box1=clus_company %>% ggplot(mapping=aes(x=clustering, y=매출20, fill=clustering)) + geom_boxplot() + ggtitle('20년도 매출액 boxplot') + theme_bw() + scale_color_manual(values=palette_cluster) + scale_fill_manual(values=palette_cluster, name="cluster") +xlab('cluster') + ylab('매출액(10억원)')
+
+
+
+box2=clus_company %>% ggplot(mapping=aes(x=clustering, y=직원수, fill=clustering)) + geom_boxplot() + ggtitle('직원수 boxplot') + theme_bw() + scale_color_manual(values=palette_cluster) + scale_fill_manual(values=palette_cluster, name="cluster") + xlab('cluster')
+
+
+box3=clus_company  %>% ggplot(mapping=aes(x=clustering, y=평균근속연수, fill=clustering)) + geom_boxplot() + ggtitle('근속연수 boxplot') + theme_bw() + scale_color_manual(values=palette_cluster) + scale_fill_manual(values=palette_cluster, name="cluster") + xlab('cluster') +ylab('근속연수')
+
+
+box4=clus_company %>% ggplot(mapping=aes(x=clustering, y=평균연봉, fill=clustering)) + geom_boxplot() + ggtitle('연봉 boxplot') + theme_bw() + scale_color_manual(values=palette_cluster) + scale_fill_manual(values=palette_cluster, name="cluster") +xlab('cluster') + ylab('연봉(백만원)')
+
+box5=clus_company  %>% ggplot(mapping=aes(x=clustering, y=기사개수, fill=clustering)) + geom_boxplot() + ggtitle('기사 개수 boxplot') + theme_bw() + scale_color_manual(values=palette_cluster) + scale_fill_manual(values=palette_cluster, name="cluster") + xlab('cluster') + ylab('기사 개수')
+
+line1=clus_company %>% filter(이익na==0) %>%  group_by(clustering) %>% summarise(이익20=sum(이익20), 이익19=sum(이익19), 이익18=sum(이익18), 이익17=sum(이익17), 이익16=sum(이익16)) %>% mutate(성장20=round((이익20-이익19)/이익19,2)*100, 성장19=round((이익19-이익18)/이익18,2)*100, 성장18=round((이익18-이익17)/이익17, 2)*100, 성장17=round((이익17-이익16)/이익16, 2)*100) %>%  gather(년도, 성장, 7:10) %>% ggplot(mapping=aes(x=년도,  y=성장, group=clustering, col=clustering)) + geom_line() + geom_point() + ggtitle('영업이익 성장률  그래프') + theme_bw() + scale_color_manual(values=palette_cluster, name="cluster") + scale_fill_manual(values=palette_cluster) + xlab('cluster') + ylab('성장률(%)') + scale_x_discrete(
+    labels = c('17년', '18년', '19년', '20년')
+  )
+
+
+
+bar1=clus_company  %>% mutate(clustering=as.factor(clustering)) %>% group_by(clustering) %>% mutate(산업군=as.factor(산업군)) %>% count(산업군) %>% ggplot(mapping=aes(x=산업군, y=n, fill=clustering)) + geom_bar( position=position_dodge(0.7), stat='identity') +ggtitle('cluster별 산업군 분포') + theme_bw()  + xlab('산업군') + ylab('기업 수') +  scale_fill_manual(values=palette_cluster, name="cluster") 
+
+
+```
+
+
+
+```{r a}
+
+
+box1
+
+line1
+
+
+
+```
+
+**20년도 매출액 해석**
+
+cluster 5의 매출액이 많이 높고, 그 뒤를 cluster 1, 2, 3, 4 순으로 높은 것을 알 수 있음
+
+cluster 2, 3, 4는 큰 차이가 없음
+
+- cluster 5의 특징을 잡을 수 있음
+
+**영업이익 증가율 그래프 해석**
+
+모든 cluster가 18년에 성장률이 감소함
+
+이 후, cluster 1, 4, 5는 감소, 3은 유지, 2는 크게 증가함
+
+특히 cluster 5의 경우 가장 크게 감소함
+
+이 후 20년에서는 증가율이 증가하거나 유지됨, cluster 5의 경우 크게 증가
+
+cluster 1은 성장률이 음수
+
+
+
+
+
+
+```{r b}
+
+
+box2
+
+box3
+
+box4
+
+box5
+
+```
+
+**직원수 boxplot 해석**
+
+cluster 5에 속하는 기업의 직원수가 다른 cluster보다 많은 것을 알 수 있음
+
+그 뒤를 cluster 1, 2, 3, 4 순으로 직원수가 많음
+
+cluster 4의 경우 직원수가 다른 cluster보다 적은 것을 알 수 있음
+
+
+**근속연수 boxplot 해석**
+
+cluster 5와 cluster 1에 속하는 기업의 근속연수가 높고,
+
+clsuter 3과 cluster 4에 속하는 기업의 근속연수가 낮은 것을 알 수 있음.
+
+
+**연봉 boxplot 해석**
+
+cluster 5에서 특이값 존재(해당 기업은 CJ이고, 직원이 임원으로 등록되어 있어 연봉이 높았음)
+
+이를 제외하면, cluster 5가 상대적으로 연봉을 주지만, 다른 cluster와 크게 차이가 없는 것을 알 수 있음.
+
+**기사 개수 boxplot 해석**
+
+cluster 5의 기업명이 들어간 기사개수가 타 cluster보다 높은 것을 알 수 있음.
+
+그 뒤를 cluster 1, 2, 3, 4가 따르고 있지만, 평균값이 비슷함.
+
+
+```{r c}
+
+
+bar1
+```
+
+**bar plot 해석**
+
+cluster 1에 포함된 기업이 속한 산업군 : 건강관리, 금융업, 산업재, 서비스업, 소비재, 소재, 유통업, 전기전자
+
+그 중 소재, 산업재, 금융업, 서비스업에 속한 기업의 수가 타 cluster보다 높음
+
+cluster 2에 포함된 기업이 속한 산업군 : 건강관리, 금융업, 산업재, 서비스업, 소비재, 소재, 유통업, 전기전자
+
+그 중 소비재, 유통업, 전기전자에 속한 기업의 수가 타 cluster보다 높음
+
+cluster 3에 포함된 기업이 속한 산업군 : 건강관리, 금융업, 산업재, 서비스업, 소비재, 소재, 소프트웨어, 유통업, 전기전자
+
+그 중 소프트웨어 산업군에 속한 기업이 존재
+
+cluster 4에 포함된 기업이 속한 산업군 : 건강관리, 금융업, 산업재, 서비스업, 소비재, 소재, 소프트웨어, 유통업, 전기전자
+
+그 중 소프트웨어, 기타, 건강관리어에 속한 기업이 타 cluster보다 높음 
+
+cluster 5에 포함된 기업이 속한 산업군 : 금융업, 산업재, 서비스업, 소비재, 소재, 전기전자
+
+
+
+
+
+3) Cluster 특징 파악하기
+
+
+(1) cluster 1
+
+산업군이 소재, 산업재, 금융업, 서비스업에 속한 기업수가 타 cluster보다 많음
+소재 산업군에 속한 기업의 수가 가장 많음
+
+cluster 6, cluster 5 다음으로 매출액, 직원수, 기사 개수가 많고, cluster 5와 근속연수 분포가 비슷함.
+
+18년 이후로 전년도 기준 당해 영업이익이 적음. 차이는 18년 이후 줄어들고 있음. 20년 기준 영업이익 성장률 4등
+
+
+기업 : 이마트, LG화학, SK이노베이션, 삼성전기, LG디스플레이, KB금융, 두산중공업, 삼성중공업, 농심, 롯데푸드, SK텔레콤, LG유플러스, 한국가스공사
+
+
+(2) cluster 2
+
+산업군이 소비재, 유통업, 전기전자에 속한 기업의 수가 타 cluster보다 높음
+
+영업이익 성장률을 제외한 모든 지표 순위가 중간에 위치.
+
+18년 이후 당해 영업이익이 전년 영업이익보다 증가하였고, 20년 당해 영업이익 성장률이 모든 cluster 사이에서 가장 큼. 20년 기중 영업이익 성장률 1등
+
+기업 : GS리테일, 동서, 현대백화점, 롯데하이마트, DB하이텍, 엘앤에프, 키움증권, 한국조선해양, CJ제일제당, 오뚜기, 풀무원, 빙그레, CJ ENM, 녹십자
+
+(3) cluster 3
+
+소프트웨어 산업군에 속한 기업이 존재함
+
+직원수, 연봉, 기사 개수는 cluster 2와 비슷하고, 근속연수 평균값이 가장 작음
+
+19년 영업이익 성장률이 크게 증가하였으나, 20년에 영업이익 성장률이 크게 감소함. 다른 cluster의 경우 모두 증가하였음. 20년 기준 영업이익 성장률 5등
+
+기업 : 한화시스템, 카카오뱅크, 우리금융지주, 현대글로비스, 카카오, 하이브, 펄어비스, 위지윅스튜디오, 카카오게임즈, SK 바이오사이언스, 쿠콘, 코리아센터, 한국정보인증
+
+(4) cluster 4
+
+소프트웨어 산업군에 속한 기업이 가장 많은 cluster
+
+또한 건강관리에 속한 기업이 가장 많음
+
+직원 수, 기사 개수, 평균 연봉이 모든 cluster에 비해 낮은 편이고, 근속 연수 또한 낮은편
+
+18년 영업이익 성장률 감소가 가장 작았던 기업, 20년 기준 영업이익 성장률 2등
+
+
+기업 : LX세미콘, 신한지주, 크래프톤, 위메이드, JYP Ent., 삼성바이오로직스, 아프리카TV, 안랩, 한글과컴퓨터, NHN한국사이버결제
+
+
+(5) cluster 5
+
+해당 cluster에 포함된 기업이 다양한 산업군에 포함되어 있음
+
+20년도 매출액, 직원 수, 근속연수, 연봉, 기사 개수 모두 5개의 cluster 중 가장 높은 분포를 가짐 (기업 size가 큼)
+
+18년 이후 영업이익 증가율이 일정하게 증가함. 20년 기준 영업이익 성장률 3등
+
+
+기업 : 포스코, 한화, SK하이닉스, LG전자, CJ, 현대자동차, 기아, 대한항공, 케이티(kt)
+
+
+
+
+```{r d}
+
+clus_company %>% filter(clustering==3)
+
+
+```
+
+
+
+
+
