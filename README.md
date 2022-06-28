@@ -1,3 +1,7 @@
+<h1> 구직자를 위한 기업 트렌드 시각화 경진대회 참가팀 케어베어</h1>
+<div>
+한국 고용 정보원이 주체하는 "구직자를 위한 기업 트렌드 시각화 경진대회 장려상(4위) 수상작입니다.
+</div>
 <div>
 
 <p>시각화 사이트 링크는 <a href="https://public.tableau.com/views/_16433263950510/sheet0?:language=ko-KR&:display_count=n&:origin=viz_share_link" style = "font-size: 30px; font-weight:500">Tableau</a> 입니다. 이 주소로 대시보드를 확인해보시면 됩니다. Tableau 사용법은 아래 Tableau 시각화 항목에 있으니 참고해 주시길 바랍니다.</p>
