@@ -119,10 +119,6 @@ company=company %>% mutate(산업군=as.factor(산업군), 이익na=as.factor(�
 ```
 
 
-```R
-head(company)
-```
-
 
 <table>
 <thead><tr><th scope=col>기업</th><th scope=col>산업군</th><th scope=col>매출20</th><th scope=col>이익20</th><th scope=col>이익19</th><th scope=col>이익18</th><th scope=col>이익17</th><th scope=col>이익16</th><th scope=col>남정직원수</th><th scope=col>남계약직수</th><th scope=col>...</th><th scope=col>직원수</th><th scope=col>평균근속연수</th><th scope=col>평균연봉</th><th scope=col>경도</th><th scope=col>위도</th><th scope=col>기사개수</th><th scope=col>전체순위</th><th scope=col>산업군순위</th><th scope=col>주소</th><th scope=col>이익na</th></tr></thead>
