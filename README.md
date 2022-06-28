@@ -256,7 +256,7 @@ line_영업이익
 ```
 
 
-![png](output_14_0.png)
+![png](img/output_14_0.png)
 
 
 <div>
@@ -279,7 +279,7 @@ grid.arrange(hist_매출_1, hist_직원수, ncol=2)
 ```
 
 
-![png](output_17_0.png)
+![png](img/output_17_0.png)
 
 
 <div>
@@ -315,11 +315,11 @@ grid.arrange(industry_근속연수, industry_기사개수, nrow=1)
 ```
 
 
-![png](output_20_0.png)
+![png](img/output_20_0.png)
 
 
 
-![png](output_20_1.png)
+![png](img/output_20_1.png)
 
 
 <div>
@@ -342,7 +342,7 @@ pie_na
 ```
 
 
-![png](output_23_0.png)
+![png](img/output_23_0.png)
 
 
 <div>
@@ -400,7 +400,7 @@ fviz_nbclust(gower_mat, pam, method='wss')
 ```
 
 
-![png](output_29_0.png)
+![png](img/output_29_0.png)
 
 
 <div>
@@ -425,7 +425,7 @@ fviz_cluster(result, data = modeling_data) + theme_bw() + scale_fill_manual(valu
 ```
 
 
-![png](output_32_0.png)
+![png](img/output_32_0.png)
 
 
 
@@ -490,7 +490,7 @@ grid.arrange(box1, line1, nrow=1)
 ```
 
 
-![png](output_39_0.png)
+![png](img/output_39_0.png)
 
 
 <p style = "font-weight: 600; margin-bottom:10px">i) 20년도 매출액 해석</p>
@@ -519,11 +519,11 @@ grid.arrange(box4, box5, nrow=1)
 ```
 
 
-![png](output_42_0.png)
+![png](img/output_42_0.png)
 
 
 
-![png](output_42_1.png)
+![png](img/output_42_1.png)
 
 
 <p style = "font-weight: 600; margin-bottom:10px">i) 직원수 boxplot 해석</p>
@@ -560,7 +560,7 @@ bar1
 ```
 
 
-![png](output_45_0.png)
+![png](img/output_45_0.png)
 
 
 <div>
